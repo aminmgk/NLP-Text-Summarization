@@ -1,71 +1,76 @@
+### 1. Import Necessary Libraries:
+
 ```python
-# Import necessary libraries
-from nltk import FreqDist
-from nltk.tokenize import word_tokenize, sent_tokenize
-from nltk.stem.wordnet import WordNetLemmatizer
+from nltk.tokenize import sent_tokenize, word_tokenize
 from nltk.corpus import stopwords
-from bs4 import BeautifulSoup
-from urllib.request import urlopen
-from gensim.models import Phrases
-from gensim.models.phrases import Phraser
+from gensim.models.phrases import Phrases, Phraser
 from collections import Counter
-import string
+```
 
-# Define functions for text summarization
-def intersection(sent1, sent2):
-    # As sentences are lists of tokens, there is no need to split them.
-    intersection = [i for i in sent1 if i in sent2]
-    return len(intersection) / ((len(sent1) + len(sent2)) / 2)
+Explanation:
+- `nltk`: Natural Language Toolkit, used for natural language processing tasks.
+- `gensim`: Library for topic modeling and document similarity analysis.
+- `Counter`: Helps count occurrences of elements in a list.
 
+### 2. Define Functions:
+
+#### `split_sentences(sents)`
+
+```python
 def split_sentences(sents):
-    sentence_stream = [[i for i in word_tokenize(sent) if i not in stop] for sent in sents]
+    stop = set(stopwords.words('english'))
+    sentence_stream = [[word.lower() for word in word_tokenize(sent) if word.isalnum() and word.lower() not in stop] for sent in sents]
     bigram = Phrases(sentence_stream, min_count=2, threshold=2, delimiter=b'_')
     bigram_phraser = Phraser(bigram)
     bigram_tokens = bigram_phraser[sentence_stream]
-    trigram = Phrases(bigram_tokens, min_count=2, threshold=2, delimiter=b'_')
-    trigram_phraser = Phraser(trigram)
-    trigram_tokens = trigram_phraser[bigram_tokens]
-    all_words = [i for j in trigram_tokens for i in j]
-    frequent_words = [i for i in Counter(all_words).most_common() if i[1] > 1]
-    sentences = [i for i in trigram_tokens]
+    
+    all_words = [word for tokens in bigram_tokens for word in tokens]
+    frequent_words = [word for word, count in Counter(all_words).items() if count > 1]
+    sentences = [' '.join(tokens) for tokens in bigram_tokens]
+
     return frequent_words, sentences
+```
 
-def score_sentences(words, sentences):
-    # Return scores for sentences.
-    scores = Counter()
-    # Words - list of words and their scores, first element is the word, second - its score.
-    for word in words:
-        for i in range(0, len(sentences)):
-            # If word is also in title, then add double score to the sentence.
-            if word[0] in sentences[i] and word[0] in title:
-                scores[i] += 2 * word[1]
-            elif word[0] in sentences[i]:
-                scores[i] += word[1]
-    sentence_scores = sorted(scores.items(), key=scores.__getitem__, reverse=True)
-    return sentence_scores
+Explanation:
+- Tokenizes sentences and words using NLTK.
+- Removes stopwords and non-alphanumeric characters.
+- Applies Phrases model from Gensim to find bigrams.
+- Extracts frequent words and constructs sentences.
 
+#### `get_summary(text, limit=3)`
+
+```python
 def get_summary(text, limit=3):
     sents = sent_tokenize(text)
     frequent_words, sentences = split_sentences(sents)
-    sentence_scores = score_sentences(frequent_words, sentences)
-    limited_sents = [sents[num] for num, count in sentence_scores[:limit]]
-    best_sents = [i[0] for i in sorted([(i, text.find(i)) for i in limited_sents], key=lambda x: x[0])]
-    return best_sents
+    summary = [sent for sent in sentences if any(word in sent for word in frequent_words)][:limit]
+    return summary
+```
 
+Explanation:
+- Tokenizes the input text into sentences.
+- Calls `split_sentences` to get frequent words and sentences.
+- Creates a summary by selecting sentences containing frequent words.
+
+#### `summarize(text, limit=3)`
+
+```python
 def summarize(text, limit=3):
     summary = get_summary(text, limit)
-    print(title)
-    print()
-    print(' '.join(summary))
-
-# Example of using the functions
-url = urlopen('http://news.sky.com/story/snap-election-to-be-held-in-march-after-northern-ireland-government-collapses-10731488')
-soup = BeautifulSoup(url.read().decode('utf8'), "lxml")
-text = '\n\n'.join(map(lambda p: p.text, soup.find_all('p')))
-text = text[text.find('An early election'):]
-
-title = soup.find('h1').text.strip()
-
-# Execute the summarization
-summarize(text, 5)
+    print('\n'.join(summary))
 ```
+
+Explanation:
+- Calls `get_summary` to obtain the summary.
+- Prints the summary, separating each sentence with a newline.
+
+### 3. Example Usage:
+
+```python
+text = "Natural language processing is a subfield of artificial intelligence that focuses on the interaction between computers and humans using natural language."
+summarize(text, 2)
+```
+
+Explanation:
+- Initializes a text variable with a sample content.
+- Calls `summarize` function with the text and specifies a limit of 2 sentences for the summary.
